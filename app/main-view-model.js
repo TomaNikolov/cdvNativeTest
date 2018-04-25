@@ -1,5 +1,6 @@
 var Observable = require("data/observable").Observable;
 var application = require("application");
+let defineCordova = false;
 
 function getMessage(counter) {
     if (counter <= 0) {
@@ -9,7 +10,7 @@ function getMessage(counter) {
     }
 }
 
-function createViewModel() {
+function createViewModel(args) {
     var viewModel = new Observable();
     viewModel.counter = 42;
     viewModel.message = getMessage(viewModel.counter);
@@ -126,13 +127,16 @@ function createViewModel() {
 
             // file: src/cordova.js
             define("cordova", function (require, exports, module) {
-
-                // Workaround for Windows 10 in hosted environment case
-                // http://www.w3.org/html/wg/drafts/html/master/browsers.html#named-access-on-the-window-object
-                if (global.cordova && !(global.cordova instanceof HTMLElement)) { // eslint-disable-line no-undef
-                    throw new Error('cordova already defined');
+                if (defineCordova) {
+                    return;
                 }
 
+                defineCordova = true
+                // Workaround for Windows 10 in hosted environment case
+                // http://www.w3.org/html/wg/drafts/html/master/browsers.html#named-access-on-the-window-object
+                // if (global.cordova && !(global.cordova instanceof HTMLElement)) { // eslint-disable-line no-undef
+                //     throw new Error('cordova already defined');
+                // }
                 var channel = require('cordova/channel');
                 var platform = require('cordova/platform');
 
@@ -961,47 +965,103 @@ function createViewModel() {
                 var nextTick = resolvedPromise ? function (fn) { resolvedPromise.then(fn); } : function (fn) { setTimeout(fn); };
 
                 function androidExec(success, fail, service, action, args) {
-                    if (bridgeSecret < 0) {
-                        // If we ever catch this firing, we'll need to queue up exec()s
-                        // and fire them once we get a secret. For now, I don't think
-                        // it's possible for exec() to be called since plugins are parsed but
-                        // not run until until after onNativeReady.
-                        throw new Error('exec() called without bridgeSecret');
-                    }
+
+
+
+                     args = args || [];
+                     // Process any ArrayBuffers in the args into a string.
+                    //  const jsonArr = Array.create(org.json.JSONArray, args.length)
+                     for (var i = 0; i < args.length; i++) {
+                         if (utils.typeName(args[i]) == 'ArrayBuffer') {
+                             args[i] = base64.fromArrayBuffer(args[i]);
+                         }
+
+                        //  jsonArr[i] = new org.json.JSONObject(JSON.stringify(args[i]));
+                     }
+
+                     var callbackId = service + cordova.callbackId++,
+                         argsJson = JSON.stringify(args);
+                     if (success || fail) {
+                         cordova.callbacks[callbackId] = { success: success, fail: fail };
+                     }
+
+                     const callbackContext = new org.apache.cordova.CallbackContext(callbackId, new org.apache.cordova.PluginResultCalllback({
+                        sendPluginResult: (pluginResult, callbackId) => {
+                            console.log("entering  sendPluginResult *********************************");
+                            console.log("pluginResult: ", pluginResult);
+                            console.log("callbackId: ", callbackId);
+                            const callback = cordova.callbacks[callbackId];
+                            const status = pluginResult.getStatus();
+                            console.log("status: ", status);
+                            console.log("callback: ", JSON.stringify(callback));
+                            const args = JSON.parse(pluginResult.getMessage());
+                            console.log("args: ", args);
+                            if (status === 1 /* com.apache.cordova.PluginResult.Status.OK */) {
+                               callback.success(args)
+                            } else if (status === 9 /*com.apache.cordova.PluginResult.Status.ERROR */) {
+                                callback.fail(args)
+                            }
+
+                            // try {
+                            //     var callback = cordova.callbacks[callbackId];
+
+                            //     if (callback) {
+                            //         if (status === cordova.callbackStatus.OK) {
+                            //             callback.success && callback.success.apply(null, args);
+                            //         } else if (!isSuccess) {
+                            //             callback.fail && callback.fail.apply(null, args);
+                            //         }
+
+                            //     }
+                            // } catch (err) {
+                            //     var msg = 'Error in ' + (isSuccess ? 'Success' : 'Error') + ' callbackId: ' + callbackId + ' : ' + err;
+                            //     console && console.log && console.log(msg);
+                            //     throw err;
+                            // }
+                        }
+                     }))
+
+                    const pluginMng = new org.apache.cordova.CordovaPluginManager(callbackContext)
+                    pluginMng.exec(service, action, new org.json.JSONArray(argsJson))
+
+                    application.android.on(application.AndroidApplication.activityResultEvent, function (args) {
+                        console.log("Event: " + args.eventName + ", Activity: " + args.activity +
+                        ", requestCode: " + args.requestCode + ", resultCode: " + args.resultCode + ", Intent: " + args.intent);
+                        if (pluginMng) {
+                            console.log("Calling onActivityResult **********************************")
+                            pluginMng.onActivityResult(args.requestCode, args.resultCode, args.intent)
+                            console.log("Exiting onActivityResult *********************************")
+                        }
+                    });
+
+                    debugger;
+                    // if (bridgeSecret < 0) {
+                    //     // If we ever catch this firing, we'll need to queue up exec()s
+                    //     // and fire them once we get a secret. For now, I don't think
+                    //     // it's possible for exec() to be called since plugins are parsed but
+                    //     // not run until until after onNativeReady.
+                    //     throw new Error('exec() called without bridgeSecret');
+                    // }
                     // Set default bridge modes if they have not already been set.
                     // By default, we use the failsafe, since addJavascriptInterface breaks too often
-                    if (jsToNativeBridgeMode === undefined) {
-                        androidExec.setJsToNativeBridgeMode(jsToNativeModes.JS_OBJECT);
-                    }
+                    // if (jsToNativeBridgeMode === undefined) {
+                    //     androidExec.setJsToNativeBridgeMode(jsToNativeModes.JS_OBJECT);
+                    // }
 
                     // If args is not provided, default to an empty array
-                    args = args || [];
 
-                    // Process any ArrayBuffers in the args into a string.
-                    for (var i = 0; i < args.length; i++) {
-                        if (utils.typeName(args[i]) == 'ArrayBuffer') {
-                            args[i] = base64.fromArrayBuffer(args[i]);
-                        }
-                    }
-
-                    var callbackId = service + cordova.callbackId++,
-                        argsJson = JSON.stringify(args);
-                    if (success || fail) {
-                        cordova.callbacks[callbackId] = { success: success, fail: fail };
-                    }
-
-                    var msgs = nativeApiProvider.get().exec(bridgeSecret, service, action, callbackId, argsJson);
-                    // If argsJson was received by Java as null, try again with the PROMPT bridge mode.
-                    // This happens in rare circumstances, such as when certain Unicode characters are passed over the bridge on a Galaxy S2.  See CB-2666.
-                    if (jsToNativeBridgeMode == jsToNativeModes.JS_OBJECT && msgs === "@Null arguments.") {
-                        androidExec.setJsToNativeBridgeMode(jsToNativeModes.PROMPT);
-                        androidExec(success, fail, service, action, args);
-                        androidExec.setJsToNativeBridgeMode(jsToNativeModes.JS_OBJECT);
-                    } else if (msgs) {
-                        messagesFromNative.push(msgs);
-                        // Always process async to avoid exceptions messing up stack.
-                        nextTick(processMessages);
-                    }
+                    // var msgs = nativeApiProvider.get().exec(bridgeSecret, service, action, callbackId, argsJson);
+                    // // If argsJson was received by Java as null, try again with the PROMPT bridge mode.
+                    // // This happens in rare circumstances, such as when certain Unicode characters are passed over the bridge on a Galaxy S2.  See CB-2666.
+                    // if (jsToNativeBridgeMode == jsToNativeModes.JS_OBJECT && msgs === "@Null arguments.") {
+                    //     androidExec.setJsToNativeBridgeMode(jsToNativeModes.PROMPT);
+                    //     androidExec(success, fail, service, action, args);
+                    //     androidExec.setJsToNativeBridgeMode(jsToNativeModes.JS_OBJECT);
+                    // } else if (msgs) {
+                    //     messagesFromNative.push(msgs);
+                    //     // Always process async to avoid exceptions messing up stack.
+                    //     nextTick(processMessages);
+                    // }
                 }
 
                 androidExec.init = function () {
@@ -1292,10 +1352,10 @@ function createViewModel() {
                 }
 
                 // Register pause, resume and deviceready channels as events on document.
-                channel.onPause = cordova.addDocumentEventHandler('pause');
-                channel.onResume = cordova.addDocumentEventHandler('resume');
-                channel.onActivated = cordova.addDocumentEventHandler('activated');
-                channel.onDeviceReady = cordova.addStickyDocumentEventHandler('deviceready');
+                // channel.onPause = cordova.addDocumentEventHandler('pause');
+                // channel.onResume = cordova.addDocumentEventHandler('resume');
+                // channel.onActivated = cordova.addDocumentEventHandler('activated');
+                // channel.onDeviceReady = cordova.addStickyDocumentEventHandler('deviceready');
 
                 // Listen for DOMContentLoaded and notify our channel subscribers.
                 // if (document.readyState === 'complete' || document.readyState === 'interactive') {
@@ -1872,6 +1932,8 @@ function createViewModel() {
 
             });
 
+
+
             // file: src/common/pluginloader.js
             define("cordova/pluginloader", function (require, exports, module) {
 
@@ -1880,6 +1942,11 @@ function createViewModel() {
                 // Helper function to inject a <script> tag.
                 // Exported for testing.
                 exports.injectScript = function (url, onload, onerror) {
+                    // TODO: fix the cordova-plugin.js path
+                    // global.require(url)
+                    // onload()
+
+
                     // var script = document.createElement('script');
                     // // onload fires even when script fails loads with an error.
                     // script.onload = onload;
@@ -1952,6 +2019,7 @@ function createViewModel() {
                 }
 
                 function findCordovaPath() {
+                    return "cordova/";
                     // var path = null;
                     // var scripts = document.getElementsByTagName('script');
                     // var term = '/cordova.js';
@@ -2044,7 +2112,7 @@ function createViewModel() {
 
             });
 
-            // file: src/common/utils.js
+            // file: src/common/utils.i
             define("cordova/utils", function (require, exports, module) {
 
                 var utils = exports;
@@ -2219,9 +2287,7 @@ function createViewModel() {
         })();
 
 
-        var ImagePicker = function () {
-
-        };
+        var ImagePicker = function () {};
 
         ImagePicker.prototype.OutputType = {
             FILE_URI: 0,
@@ -2292,11 +2358,21 @@ function createViewModel() {
         // const imagePicker = new com.synconset.ImagePicker()
         // imagePicker.custom("Some text");
 
+        var view = require("ui/core/view");
+        var page = args.object;
+        var img = view.getViewById(page, "img");
         const success = function (results) {
+            if (results === "OK") {
+                return
+            }
+
             for (var i = 0; i < results.length; i++) {
+                console.log('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&');
                 console.log('Image URI: ' + results[i]);
+                img.src = results[i]
             }
         }
+
 
         const fail = function (error) {
             console.log('Error: ' + error);
@@ -2304,11 +2380,12 @@ function createViewModel() {
 
         imagepicker.getPictures(success, fail);
 
-        const successNS = function (results) {
-            for (var i = 0, size = results.size(); i < size; i++) {
-                console.log('Image URI: ' + results.get(i));
-            }
-        }
+        // const successNS = function (results) {
+        //     for (var i = 0, size = results.size(); i < size; i++) {
+        //         console.log('Image URI: ' + results.get(i));
+        //         image.src = results.get(i)
+        //     }
+        // }
 
         // const callbackContext = new org.apache.cordova.CallbackContext("27");
         // const args = new org.json.JSONArray("[{}, {}]");
