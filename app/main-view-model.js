@@ -1,7 +1,5 @@
 var Observable = require("data/observable").Observable;
 var application = require("application");
-let defineCordova = false;
-
 
 /**
  * Start cordova
@@ -113,11 +111,6 @@ let defineCordova = false;
 
     // file: src/cordova.js
     define("cordova", function (require, exports, module) {
-        if (defineCordova) {
-            return;
-        }
-
-        defineCordova = true
         // Workaround for Windows 10 in hosted environment case
         // http://www.w3.org/html/wg/drafts/html/master/browsers.html#named-access-on-the-window-object
         // if (global.cordova && !(global.cordova instanceof HTMLElement)) { // eslint-disable-line no-undef
@@ -1179,7 +1172,7 @@ let defineCordova = false;
 
     // file: src/common/init.js
     define("cordova/init", function (require, exports, module) {
-
+        debugger;
         var channel = require('cordova/channel');
         var cordova = require('cordova');
         var modulemapper = require('cordova/modulemapper');
@@ -1275,6 +1268,7 @@ let defineCordova = false;
 
         // Wrap in a setTimeout to support the use-case of having plugin JS appended to cordova.js.
         // The delay allows the attached modules to be defined before the plugin loader looks for them.
+        debugger;
         setTimeout(function () {
             pluginloader.load(function () {
                 channel.onPluginsReady.fire();
@@ -1399,6 +1393,7 @@ let defineCordova = false;
 
         // Wrap in a setTimeout to support the use-case of having plugin JS appended to cordova.js.
         // The delay allows the attached modules to be defined before the plugin loader looks for them.
+        debugger;
         setTimeout(function () {
             pluginloader.load(function () {
                 channel.onPluginsReady.fire();
@@ -1834,9 +1829,10 @@ let defineCordova = false;
         // Helper function to inject a <script> tag.
         // Exported for testing.
         exports.injectScript = function (url, onload, onerror) {
+            debugger;
             // TODO: fix the cordova-plugin.js path
-            // global.require(url)
-            // onload()
+            global.require(url)
+            onload()
 
 
             // var script = document.createElement('script');
@@ -1911,7 +1907,7 @@ let defineCordova = false;
         }
 
         function findCordovaPath() {
-            return "cordova/";
+            return "cordova-plugin-telerik-imagepicker/";
             // var path = null;
             // var scripts = document.getElementsByTagName('script');
             // var term = '/cordova.js';
@@ -1929,6 +1925,8 @@ let defineCordova = false;
         // This is an async process, but onDeviceReady is blocked on onPluginsReady.
         // onPluginsReady is fired when there are no plugins to load, or they are all done.
         exports.load = function (callback) {
+            debugger;
+
             var pathPrefix = findCordovaPath();
             if (pathPrefix === null) {
                 console.log('Could not find cordova.js script tag. Plugin loading may fail.');
@@ -2175,76 +2173,12 @@ let defineCordova = false;
 
     require('cordova/init');
     require('cordova/init_b');
-
 })();
-
-
-var ImagePicker = function () { };
-
-ImagePicker.prototype.OutputType = {
-    FILE_URI: 0,
-    BASE64_STRING: 1
-};
-
-ImagePicker.prototype.validateOutputType = function (options) {
-    var outputType = options.outputType;
-    if (outputType) {
-        if (outputType !== this.OutputType.FILE_URI && outputType !== this.OutputType.BASE64_STRING) {
-            console.log('Invalid output type option entered. Defaulting to FILE_URI. Please use global.imagePicker.OutputType.FILE_URI or global.imagePicker.OutputType.BASE64_STRING');
-            options.outputType = this.OutputType.FILE_URI;
-        }
-    }
-};
-
-ImagePicker.prototype.hasReadPermission = function (callback) {
-    return cordova.exec(callback, null, "ImagePicker", "hasReadPermission", []);
-};
-
-ImagePicker.prototype.requestReadPermission = function (callback) {
-    return cordova.exec(callback, null, "ImagePicker", "requestReadPermission", []);
-};
-
-/*
-*	success - success callback
-*	fail - error callback
-*	options
-*		.maximumImagesCount - max images to be selected, defaults to 15. If this is set to 1,
-*		                      upon selection of a single image, the plugin will return it.
-*		.width - width to resize image to (if one of height/width is 0, will resize to fit the
-*		         other while keeping aspect ratio, if both height and width are 0, the full size
-*		         image will be returned)
-*		.height - height to resize image to
-*		.quality - quality of resized image, defaults to 100
-*       .outputType - type of output returned. defaults to file URIs.
-*					  Please see ImagePicker.OutputType for available values.
-*/
-ImagePicker.prototype.getPictures = function (success, fail, options) {
-    if (!options) {
-        options = {};
-    }
-
-    this.validateOutputType(options);
-
-    var params = {
-        maximumImagesCount: options.maximumImagesCount ? options.maximumImagesCount : 15,
-        width: options.width ? options.width : 0,
-        height: options.height ? options.height : 0,
-        quality: options.quality ? options.quality : 100,
-        allow_video: options.allow_video ? options.allow_video : false,
-        title: options.title ? options.title : 'Select an Album', // the default is the message of the old plugin impl
-        message: options.message ? options.message : null, // the old plugin impl didn't have it, so passing null by default
-        outputType: options.outputType ? options.outputType : this.OutputType.FILE_URI,
-        disable_popover: options.disable_popover ? options.disable_popover : false // Disable the iOS popover as seen on iPad
-    };
-
-    return cordova.exec(success, fail, "ImagePicker", "getPictures", [params]);
-};
-
-imagepicker = new ImagePicker();
 
 /**
  * End cordova
  */
+
 
 function getMessage(counter) {
     if (counter <= 0) {
@@ -2255,79 +2189,35 @@ function getMessage(counter) {
 }
 
 function createViewModel(args) {
-    var viewModel = new Observable();
+    const viewModel = new Observable();
     viewModel.counter = 42;
     viewModel.message = getMessage(viewModel.counter);
 
     viewModel.onTap = function () {
         this.counter--;
         this.set("message", getMessage(this.counter));
-        // const imagePicker = new com.synconset.ImagePicker()
-        // imagePicker.custom("Some text");
+        const view = require("ui/core/view");
+        const page = args.object;
+        let img = view.getViewById(page, "img");
 
-        var view = require("ui/core/view");
-        var page = args.object;
-        var img = view.getViewById(page, "img");
-        const success = function (results) {
-            console.log("^^^^^^^^^^ success &&&&&&&&&&&&&&&&&&&&&&")
+        const success = results => {
             if (results === "OK") {
                 return
             }
 
             for (var i = 0; i < results.length; i++) {
-                console.log('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&');
                 console.log('Image URI: ' + results[i]);
                 img.src = results[i]
             }
         }
 
-
-        const fail = function (error) {
+        const fail = error => {
             console.log('Error: ' + error);
         }
 
-        imagepicker.getPictures(success, fail);
-
-        // const successNS = function (results) {
-        //     for (var i = 0, size = results.size(); i < size; i++) {
-        //         console.log('Image URI: ' + results.get(i));
-        //         image.src = results.get(i)
-        //     }
-        // }
-
-        // const callbackContext = new org.apache.cordova.CallbackContext("27");
-        // const args = new org.json.JSONArray("[{}, {}]");
-        // application.android.on(application.AndroidApplication.activityResultEvent, function (args) {
-        //     console.log("Event: " + args.eventName + ", Activity: " + args.activity +
-        //     ", requestCode: " + args.requestCode + ", resultCode: " + args.resultCode + ", Intent: " + args.intent);
-        //     if (args.resultCode === -1) {
-        //         const results = args.intent.getStringArrayListExtra("MULTIPLEFILENAMES");
-        //         console.log("SUCCESS!");
-        //         successNS(results);
-        //     } else {
-        //         console.log("FAIL!!!");
-        //         fail(args.intent && args.intent.getStringExtra("ERRORMESSAGE") || "Generic error");
-        //     }
-        // });
-        // imagePicker.execute("getPictures", args, callbackContext);
-
-
-        // const cameraSuccess = function (imageData) {
-        //     console.log("imageData", imageData);
-        // }
-
-        // const cameraError = function (error) {
-        //     console.debug("Unable to obtain picture: " + error, "app");
-        // }
-        // const camera = new org.apache.cordova.camera.CameraLauncher();
-        // const cameraArgs = new org.json.JSONArray("[50, 1, 1, -1, -1, 0, 0, false, false, false, null, 0]");
-        // camera.execute("takePicture", cameraArgs, callbackContext);
-
-
-
-        // require("cordova-plugin-telerik-imagepicker").requestReadPermission(() => {
-        //     console.log("SUCCESS!!!!!!!!!!!!!!!!!!!!!!!\n\n\n\n\nSUCCESS!!!");
-        // });
+        const ip = cordova.require("com.synconset.imagepicker.ImagePicker");
+        // imagePicker.getPictures(success, fail);
+        ip.getPictures(success, fail);
     }
 
     return viewModel;
