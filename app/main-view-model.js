@@ -1907,7 +1907,7 @@ var application = require("application");
         }
 
         function findCordovaPath() {
-            return "cordova-plugin-telerik-imagepicker/";
+            return "";
             // var path = null;
             // var scripts = document.getElementsByTagName('script');
             // var term = '/cordova.js';
@@ -1932,7 +1932,7 @@ var application = require("application");
                 console.log('Could not find cordova.js script tag. Plugin loading may fail.');
                 pathPrefix = '';
             }
-            injectIfNecessary('cordova/plugin_list', pathPrefix + 'cordova_plugins.js', function () {
+            injectIfNecessary('cordova/plugin_list', 'cordova-plugin-telerik-imagepicker/cordova_plugins.js', function () {
                 var moduleList = require('cordova/plugin_list');
                 handlePluginsObject(pathPrefix, moduleList, callback);
             }, callback);
